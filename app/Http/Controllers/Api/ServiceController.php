@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -14,13 +12,12 @@ class ServiceController extends Controller
     public function index(Request $request): JsonResponse
     {
         $status = $request->query("status");
-
+        
         $query = Service::query();
 
         if ($status !== null) {
 
             if (!in_array($status, ["active", "inactive"], true)) {
-
                 return response()->json([
                     "success" => false,
                     "message" => "Validation failed",
@@ -37,7 +34,7 @@ class ServiceController extends Controller
 
         return response()->json([
             "success" => true,
-            "message" => "Services retrieved successfully",
+            "message" => "Service retrieved successfully",
             "data" => $services,
         ]);
     }
@@ -57,17 +54,18 @@ class ServiceController extends Controller
 
         return response()->json([
             "success" => true,
-            "message" => "Service created successfully",
+            "message" => "Service created succesfully",
             "data" => $service,
         ], 201);
     }
 
     public function show(int $service): JsonResponse
     {
-        $service = Service::query()->find($service);
+        $service = Service::query()
+            ->with('subscriptions.customer')
+            ->find($service);
 
         if (!$service) {
-
             return response()->json([
                 "success" => false,
                 "message" => "Service not found",
@@ -87,7 +85,6 @@ class ServiceController extends Controller
         $service = Service::query()->find($service);
 
         if (!$service) {
-
             return response()->json([
                 "success" => false,
                 "message" => "Service not found",
@@ -116,7 +113,6 @@ class ServiceController extends Controller
         $service = Service::query()->find($service);
 
         if (!$service) {
-
             return response()->json([
                 "success" => false,
                 "message" => "Service not found",
@@ -125,12 +121,11 @@ class ServiceController extends Controller
         }
 
         if ($service->subscriptions()->exists()) {
-
             return response()->json([
                 "success" => false,
-                "message" => "Service cannot be deleted because it has subscriptions",
+                "message" => "Cannot delete service with active subscriptions",
                 "errors" => [],
-            ], 422);
+            ], 400);
         }
 
         $service->delete();
@@ -147,7 +142,6 @@ class ServiceController extends Controller
         $service = Service::query()->find($service);
 
         if (!$service) {
-
             return response()->json([
                 "success" => false,
                 "message" => "Service not found",
@@ -161,7 +155,7 @@ class ServiceController extends Controller
 
         return response()->json([
             "success" => true,
-            "message" => "Service activated successfully",
+            "message" => "Service actived successfully",
             "data" => $service,
         ]);
     }
@@ -171,7 +165,6 @@ class ServiceController extends Controller
         $service = Service::query()->find($service);
 
         if (!$service) {
-
             return response()->json([
                 "success" => false,
                 "message" => "Service not found",

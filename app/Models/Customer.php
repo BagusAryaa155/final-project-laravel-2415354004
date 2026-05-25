@@ -9,14 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
-    protected $fillable = ["customer_id", "name", "email", "phone", "address", "status"];
-
-    protected function casts(): array
-    {
-        return [
-            "status" => "boolean",
-        ];
-    }
+    protected $fillable = [
+        "customer_id",
+        "name",
+        "email",
+        "phone",
+        "address",
+        "status"
+    ];
 
     public function subscriptions(): HasMany
     {

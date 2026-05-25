@@ -6,6 +6,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Customer;
+use App\Models\Service;
+use App\enums\SubscriptionStatus;
 
 class Subscription extends Model
 {
@@ -16,6 +19,15 @@ class Subscription extends Model
         "end_date",
         "status"
     ];
+
+    protected function casts(): array
+    {
+        return [
+            "start_date" => "date",
+            "end_date" => "date",
+            "status" => SubscriptionStatus::class,
+        ];
+    }
 
     public function customer(): BelongsTo
     {

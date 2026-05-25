@@ -1,126 +1,111 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
+use App\Models\Service;
 use App\Models\Subscription;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class SubscriptionController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(): View
     {
-        $subscriptions = Subscription::query()
-            ->with(["customer", "service"])
-            ->latest()
-            ->get();
+        $subscriptions = Subscription::with([
+            'customer',
+            'service'
+        ])->get();
 
-        return response()->json([
-            "success" => true,
-            "message" => "Subscriptions retrieved successfully",
-            "data" => $subscriptions,
+        $customers = Customer::where('status', true)->get();
+
+        $services = Service::where('status', true)->get();
+
+        return view('subscriptions.index', [
+            'active' => 'subscriptions',
+            'subscriptions' => $subscriptions,
+            'customers' => $customers,
+            'services' => $services,
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            "customer_id" => ["required", "exists:customers,id"],
-            "service_id" => ["required", "exists:services,id"],
-            "start_date" => ["nullable", "date"],
-            "end_date" => ["nullable", "date"],
-            "status" => [
-                "required",
-                "in:active,inactive,trial,isolir,dismantle"
-            ],
+        $request->validate([
+            'customer_id' => 'required',
+            'service_id' => 'required',
+            'start_date' => 'required',
+            'end_date' => 'required',
+            'status' => 'required',
         ]);
 
-        $subscription = Subscription::query()->create($data);
+        Subscription::create([
+            'customer_id' => $request->customer_id,
+            'service_id' => $request->service_id,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'status' => $request->status,
+        ]);
 
-        return response()->json([
-            "success" => true,
-            "message" => "Subscription created successfully",
-            "data" => $subscription,
-        ], 201);
+        return redirect()
+            ->route('subscriptions.index')
+            ->with('toast_success', 'Subscription created successfully');
     }
 
-    public function show(int $subscription): JsonResponse
+    public function activate($id): RedirectResponse
     {
-        $subscription = Subscription::query()
-            ->with(["customer", "service"])
-            ->find($subscription);
+        $subscription = Subscription::findOrFail($id);
 
-        if (!$subscription) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Subscription not found",
-                "errors" => [],
-            ], 404);
-        }
-
-        return response()->json([
-            "success" => true,
-            "message" => "Subscription retrieved successfully",
-            "data" => $subscription,
+        $subscription->update([
+            'status' => 'active'
         ]);
+
+        return redirect()->route('subscriptions.index');
     }
 
-    public function update(Request $request, int $subscription): JsonResponse
+    public function deactivate($id): RedirectResponse
     {
-        $subscription = Subscription::query()->find($subscription);
+        $subscription = Subscription::findOrFail($id);
 
-        if (!$subscription) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Subscription not found",
-                "errors" => [],
-            ], 404);
-        }
-
-        $data = $request->validate([
-            "customer_id" => ["sometimes", "exists:customers,id"],
-            "service_id" => ["sometimes", "exists:services,id"],
-            "start_date" => ["nullable", "date"],
-            "end_date" => ["nullable", "date"],
-            "status" => [
-                "sometimes",
-                "in:active,inactive,trial,isolir,dismantle"
-            ],
+        $subscription->update([
+            'status' => 'inactive'
         ]);
 
-        $subscription->update($data);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Subscription updated successfully",
-            "data" => $subscription,
-        ]);
+        return redirect()->route('subscriptions.index');
     }
 
-    public function destroy(int $subscription): JsonResponse
+    public function trial($id): RedirectResponse
     {
-        $subscription = Subscription::query()->find($subscription);
+        $subscription = Subscription::findOrFail($id);
 
-        if (!$subscription) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Subscription not found",
-                "errors" => [],
-            ], 404);
-        }
-
-        $subscription->delete();
-
-        return response()->json([
-            "success" => true,
-            "message" => "Subscription deleted successfully",
-            "data" => null,
+        $subscription->update([
+            'status' => 'trial'
         ]);
+
+        return redirect()->route('subscriptions.index');
+    }
+
+    public function isolir($id): RedirectResponse
+    {
+        $subscription = Subscription::findOrFail($id);
+
+        $subscription->update([
+            'status' => 'isolir'
+        ]);
+
+        return redirect()->route('subscriptions.index');
+    }
+
+    public function dismantle($id): RedirectResponse
+    {
+        $subscription = Subscription::findOrFail($id);
+
+        $subscription->update([
+            'status' => 'dismantle'
+        ]);
+
+        return redirect()->route('subscriptions.index');
     }
 }

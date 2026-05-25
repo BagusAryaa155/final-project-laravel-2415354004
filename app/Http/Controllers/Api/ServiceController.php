@@ -1,192 +1,141 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Service;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class ServiceController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    private string $apiUrl = "http://127.0.0.1:8000/api/services";
+
+    public function index(Request $request): View
     {
-        $status = $request->query("status");
-
-        $query = Service::query();
-
-        if ($status !== null) {
-
-            if (!in_array($status, ["active", "inactive"], true)) {
-
-                return response()->json([
-                    "success" => false,
-                    "message" => "Validation failed",
-                    "errors" => [
-                        "status" => ["The selected status is invalid."],
-                    ],
-                ], 422);
-            }
-
-            $query->where("status", $status === "active");
+        $query = [];
+        if ($request->has("status")) {
+            $query["status"] = $request->status;
         }
 
-        $services = $query->latest()->get();
+        $response = Http::get($this->apiUrl, $query);
+        $services = $response->successful() ? $response->json("data") : [];
 
-        return response()->json([
-            "success" => true,
-            "message" => "Services retrieved successfully",
-            "data" => $services,
+        return view("services.index", [
+            "active" => "services",
+            "services" => $services,
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            "name" => ["required", "string"],
-            "price" => ["required", "integer", "min:0"],
-            "description" => ["nullable", "string"],
-            "status" => ["nullable", "boolean"],
+        $response = Http::post($this->apiUrl, [
+            "name" => $request->name,
+            "price" => $request->price,
+            "description" => $request->description,
+            "status" => $request->status === "active",
         ]);
 
-        $data["status"] = $data["status"] ?? true;
+        if ($response->successful()) {
+            return redirect()
+                ->route("services.index")
+                ->with("toast_success", $response->json("message"));
+        }
 
-        $service = Service::query()->create($data);
+        if ($response->status() === 422) {
+            return back()
+                ->withErrors($response->json("errors") ?? [])
+                ->withInput()
+                ->with("toast_error", $response->json("message"))
+                ->with("open_modal", "addDataModal");
+        }
 
-        return response()->json([
-            "success" => true,
-            "message" => "Service created successfully",
-            "data" => $service,
-        ], 201);
+        return back()
+            ->withInput()
+            ->with(
+                "toast_error",
+                $response->json("message") ?? "Something went wrong",
+            );
     }
 
-    public function show(int $service): JsonResponse
+    public function update(Request $request, int $id): RedirectResponse
     {
-        $service = Service::query()->find($service);
+        $response = Http::patch("{$this->apiUrl}/{$id}", [
+            "name" => $request->name,
+            "price" => $request->price,
+            "description" => $request->description,
+            "status" => $request->status === "active",
+        ]);
 
-        if (!$service) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Service not found",
-                "errors" => [],
-            ], 404);
+        if ($response->successful()) {
+            return redirect()
+                ->route("services.index")
+                ->with("toast_success", $response->json("message"));
         }
 
-        return response()->json([
-            "success" => true,
-            "message" => "Service retrieved successfully",
-            "data" => $service,
-        ]);
+        if ($response->status() === 422) {
+            return back()
+                ->withErrors($response->json("errors") ?? [])
+                ->withInput()
+                ->with("toast_error", $response->json("message"))
+                ->with("open_modal", "editDataModal")
+                ->with("edit_service_id", $id);
+        }
+
+        return back()
+            ->withInput()
+            ->with(
+                "toast_error",
+                $response->json("message") ?? "Something went wrong",
+            );
     }
 
-    public function update(Request $request, int $service): JsonResponse
+    public function destroy(int $id): RedirectResponse
     {
-        $service = Service::query()->find($service);
+        $response = Http::delete("{$this->apiUrl}/{$id}");
 
-        if (!$service) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Service not found",
-                "errors" => [],
-            ], 404);
+        if ($response->successful()) {
+            return redirect()
+                ->route("services.index")
+                ->with("toast_success", $response->json("message"));
         }
 
-        $data = $request->validate([
-            "name" => ["sometimes", "string"],
-            "price" => ["sometimes", "integer", "min:0"],
-            "description" => ["nullable", "string"],
-            "status" => ["nullable", "boolean"],
-        ]);
-
-        $service->update($data);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Service updated successfully",
-            "data" => $service,
-        ]);
+        return back()->with(
+            "toast_error",
+            $response->json("message") ?? "Something went wrong",
+        );
     }
 
-    public function destroy(int $service): JsonResponse
+    public function activate(int $id): RedirectResponse
     {
-        $service = Service::query()->find($service);
+        $response = Http::patch("{$this->apiUrl}/{$id}/activate");
 
-        if (!$service) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Service not found",
-                "errors" => [],
-            ], 404);
+        if ($response->successful()) {
+            return redirect()
+                ->route("services.index")
+                ->with("toast_success", $response->json("message"));
         }
 
-        if ($service->subscriptions()->exists()) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Service cannot be deleted because it has subscriptions",
-                "errors" => [],
-            ], 422);
-        }
-
-        $service->delete();
-
-        return response()->json([
-            "success" => true,
-            "message" => "Service deleted successfully",
-            "data" => null,
-        ]);
+        return back()->with(
+            "toast_error",
+            $response->json("message") ?? "Something went wrong",
+        );
     }
 
-    public function activate(int $service): JsonResponse
+    public function deactivate(int $id): RedirectResponse
     {
-        $service = Service::query()->find($service);
+        $response = Http::patch("{$this->apiUrl}/{$id}/deactivate");
 
-        if (!$service) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Service not found",
-                "errors" => [],
-            ], 404);
+        if ($response->successful()) {
+            return redirect()
+                ->route("services.index")
+                ->with("toast_success", $response->json("message"));
         }
 
-        $service->update([
-            "status" => true
-        ]);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Service activated successfully",
-            "data" => $service,
-        ]);
-    }
-
-    public function deactivate(int $service): JsonResponse
-    {
-        $service = Service::query()->find($service);
-
-        if (!$service) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Service not found",
-                "errors" => [],
-            ], 404);
-        }
-
-        $service->update([
-            "status" => false
-        ]);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Service deactivated successfully",
-            "data" => $service,
-        ]);
+        return back()->with(
+            "toast_error",
+            $response->json("message") ?? "Something went wrong",
+        );
     }
 }

@@ -1,187 +1,104 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $status = $request->query("status");
+        $customers = Customer::all();
 
-        $query = Customer::query();
-
-        if ($status !== null) {
-
-            if (!in_array($status, ["active", "inactive"], true)) {
-
-                return response()->json([
-                    "success" => false,
-                    "message" => "Validation failed",
-                    "errors" => [
-                        "status" => ["The selected status is invalid."],
-                    ],
-                ], 422);
-            }
-
-            $query->where("status", $status === "active");
-        }
-
-        $customers = $query->latest()->get();
-
-        return response()->json([
-            "success" => true,
-            "message" => "Customers retrieved successfully",
-            "data" => $customers,
+        return view('customers.index', [
+            'active' => 'customers',
+            'customers' => $customers,
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            "customer_id" => ["required", "string", "unique:customers,customer_id"],
-            "name" => ["required", "string"],
-            "email" => ["nullable", "email", "unique:customers,email"],
-            "phone" => ["nullable", "string"],
-            "address" => ["nullable", "string"],
-            "status" => ["nullable", "boolean"],
+        $request->validate([
+            'customer_id' => 'required',
+            'name' => 'required',
+            'email' => 'required',
+            'address' => 'required',
+            'status' => 'required',
         ]);
 
-        $data["status"] = $data["status"] ?? true;
+        Customer::create([
+            'customer_id' => $request->customer_id,
+            'name' => $request->name,
+            'email' => $request->email,
+            'address' => $request->address,
+            'status' => $request->status == 'active',
+        ]);
 
-        $customer = Customer::query()->create($data);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Customer created successfully",
-            "data" => $customer,
-        ], 201);
+        return redirect()
+            ->route('customers.index')
+            ->with('toast_success', 'Customer created successfully');
     }
 
-    public function show(int $customer): JsonResponse
+    public function update(Request $request, $id): RedirectResponse
     {
-        $customer = Customer::query()->find($customer);
+        $customer = Customer::findOrFail($id);
 
-        if (!$customer) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Customer not found",
-                "errors" => [],
-            ], 404);
-        }
-
-        return response()->json([
-            "success" => true,
-            "message" => "Customer retrieved successfully",
-            "data" => $customer,
+        $request->validate([
+            'customer_id' => 'required',
+            'name' => 'required',
+            'email' => 'required',
+            'address' => 'required',
+            'status' => 'required',
         ]);
+
+        $customer->update([
+            'customer_id' => $request->customer_id,
+            'name' => $request->name,
+            'email' => $request->email,
+            'address' => $request->address,
+            'status' => $request->status == 'active',
+        ]);
+
+        return redirect()
+            ->route('customers.index')
+            ->with('toast_success', 'Customer updated successfully');
     }
 
-    public function update(Request $request, int $customer): JsonResponse
+    public function destroy($id): RedirectResponse
     {
-        $customer = Customer::query()->find($customer);
-
-        if (!$customer) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Customer not found",
-                "errors" => [],
-            ], 404);
-        }
-
-        $data = $request->validate([
-            "customer_id" => ["sometimes", "string"],
-            "name" => ["sometimes", "string"],
-            "email" => ["nullable", "email"],
-            "phone" => ["nullable", "string"],
-            "address" => ["nullable", "string"],
-            "status" => ["nullable", "boolean"],
-        ]);
-
-        $customer->update($data);
-
-        return response()->json([
-            "success" => true,
-            "message" => "Customer updated successfully",
-            "data" => $customer,
-        ]);
-    }
-
-    public function destroy(int $customer): JsonResponse
-    {
-        $customer = Customer::query()->find($customer);
-
-        if (!$customer) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Customer not found",
-                "errors" => [],
-            ], 404);
-        }
+        $customer = Customer::findOrFail($id);
 
         $customer->delete();
 
-        return response()->json([
-            "success" => true,
-            "message" => "Customer deleted successfully",
-            "data" => null,
-        ]);
+        return redirect()
+            ->route('customers.index')
+            ->with('toast_success', 'Customer deleted successfully');
     }
 
-    public function activate(int $customer): JsonResponse
+    public function activate($id): RedirectResponse
     {
-        $customer = Customer::query()->find($customer);
-
-        if (!$customer) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Customer not found",
-                "errors" => [],
-            ], 404);
-        }
+        $customer = Customer::findOrFail($id);
 
         $customer->update([
-            "status" => true
+            'status' => true
         ]);
 
-        return response()->json([
-            "success" => true,
-            "message" => "Customer activated successfully",
-            "data" => $customer,
-        ]);
+        return redirect()
+            ->route('customers.index');
     }
 
-    public function deactivate(int $customer): JsonResponse
+    public function deactivate($id): RedirectResponse
     {
-        $customer = Customer::query()->find($customer);
-
-        if (!$customer) {
-
-            return response()->json([
-                "success" => false,
-                "message" => "Customer not found",
-                "errors" => [],
-            ], 404);
-        }
+        $customer = Customer::findOrFail($id);
 
         $customer->update([
-            "status" => false
+            'status' => false
         ]);
 
-        return response()->json([
-            "success" => true,
-            "message" => "Customer deactivated successfully",
-            "data" => $customer,
-        ]);
+        return redirect()
+            ->route('customers.index');
     }
 }
